@@ -41,12 +41,12 @@ namespace AmasTaskRunner
         
         private CancellationTokenSource cancellationTokenSource;
         private List<Task> consumers;
-        private AmazonSQSClient sqsClient;
+        private IAmazonSQS sqsClient;
         private SQSConsumerConfig config;
 
         private Dictionary<string, DateTime> processedMap;
 
-        public SQSConsumer(AmazonSQSClient sqsClient, SQSConsumerConfig config)
+        public SQSConsumer(IAmazonSQS sqsClient, SQSConsumerConfig config)
         {
             log.Info("SQS Consumer: " + config);
             
