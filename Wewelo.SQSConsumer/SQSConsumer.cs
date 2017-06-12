@@ -71,23 +71,36 @@ namespace AmasTaskRunner
             
             cancellationTokenSource = new CancellationTokenSource();
 
-            Parallel.For(0, config.Threads, index =>
+            if (config.Threads == 1)
             {
-                while (!cancellationTokenSource.IsCancellationRequested)
+                // This makes debugging easier
+                LoopAcationTask(0, action);
+            }
+            else
+            {
+                Parallel.For(0, config.Threads, index =>
                 {
-                    log.Info($"SQS Consumer threads {index} started.");
-                    try
-                    {
-                        GetActionTask(action).Wait();
-                    }
-                    catch (Exception exp)
-                    {
-                        log.Error(exp, $"SQS Consumer threads {index} had an exception.");
-                    }
-                }
-                log.Info($"SQS Consumer threads {index} stopped.");
-            });
+                    LoopAcationTask(index, action);
+                });
+            }
             log.Info("All SQS Consumer have stopped.");
+        }
+
+        private void LoopAcationTask(int index, Func<string, Task> action)
+        {
+            while (!cancellationTokenSource.IsCancellationRequested)
+            {
+                log.Info($"SQS Consumer threads {index} started.");
+                try
+                {
+                    GetActionTask(action).Wait();
+                }
+                catch (Exception exp)
+                {
+                    log.Error(exp, $"SQS Consumer threads {index} had an exception.");
+                }
+            }
+            log.Info($"SQS Consumer threads {index} stopped.");
         }
 
         public Task Stop()
