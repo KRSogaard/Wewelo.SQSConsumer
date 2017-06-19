@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Dynamic;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Net;
 using System.Threading;
@@ -45,6 +46,7 @@ namespace AmasTaskRunner
         private SQSConsumerConfig config;
 
         private Dictionary<string, DateTime> processedMap;
+        private DateTime? nextMapClean = null;
 
         public SQSConsumer(IAmazonSQS sqsClient, SQSConsumerConfig config)
         {
@@ -152,14 +154,7 @@ namespace AmasTaskRunner
                             }
                             processedMap.Add(message.MessageId, DateTime.Now);
 
-                            var keys = processedMap.Keys;
-                            foreach (var key in keys)
-                            {
-                                if (processedMap[key] < DateTime.Now.AddMinutes(-5))
-                                {
-                                    processedMap.Remove(key);
-                                }
-                            }
+                            CleanUpProcessedMap(processedMap);
                         }
 
                         try
@@ -202,6 +197,35 @@ namespace AmasTaskRunner
                 }
             }
             log.Warn("SQS Consumer thread stopped.");
+        }
+
+        private void CleanUpProcessedMap(Dictionary<string, DateTime> dateTimes)
+        {
+            if (nextMapClean != null && nextMapClean > DateTime.UtcNow)
+                return;
+
+            lock (processedMap)
+            {
+                log.Debug("Cleaning the processed map");
+                // Second check, may have been cleaned while waiting for log
+                if (nextMapClean != null && nextMapClean > DateTime.UtcNow)
+                    return;
+
+                nextMapClean = DateTime.UtcNow.AddMinutes(1);
+
+                // Need to map, so collection dose not change.
+                var keys = processedMap.Keys.ToArray();
+                foreach (var key in keys)
+                {
+                    if (processedMap.ContainsKey(key))
+                    {
+                        if (processedMap[key] < DateTime.Now.AddMinutes(-5))
+                        {
+                            processedMap.Remove(key);
+                        }
+                    }
+                }
+            }
         }
     }
 }
